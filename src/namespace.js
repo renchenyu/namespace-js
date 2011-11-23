@@ -257,10 +257,11 @@ var Namespace = (function(){
             splitted[0] = '';
             var importName = splitted.join('');
             _assertValidFQN(fqn);
-            /* 这里push是干嘛用的，先看下去~~ */
+            /* apply的时候会执行 */
             this.requires.push(function($c){
                 var context = this;
                 var require = NamespaceObjectFactory.create(fqn);
+                /* 这句执行时，构造函数里写的nsObj.enqueue(....)就会起作用啦 */
                 require.call(this,function(state){
                     context.loadImport(require,importName);
                     $c();
@@ -320,17 +321,21 @@ var Namespace = (function(){
         valueOf: function(){
             return "#NamespaceDefinition<"+this.namespaceObject+"> uses :" + this.useList.join(',');
         },
-        // 让你写的代码动起来的关键在这！
+        // 让你写的代码动起来的关键在这！ 你可以简单的认为这是真正的在javascript里“创建”Namespace
         apply: function(callback){
             var nsDef = this;
             /* 看懂这里就要靠之前Procedure的知识了 */
-            createProcedure(nsDef.requires)   //第一步，让use起作用，这里的requires是数组哦
+            //第一步，让use起作用，这里的requires是数组哦。被requires的Namespace可能也没被“创建"呢，
+            //因此会递归调用apply
+            createProcedure(nsDef.requires)   
+            //第二步，让自己的define中写的代码跑起来
             .next(nsDef.defineCallback)
             .call(nsDef,function(){
                 callback( nsDef.getStash() );
             });
         }
     });
+    /* 疑问，如果 A use B use C and A use D use C. A apply, C的define中的代码会不会执行两次？？ */
 
     var createNamespace = function(fqn){
         return new NamespaceDefinition(
